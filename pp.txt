@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Community Hub</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f0f8ff;
+        }
+        .post-box {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        h1 {
+            text-align: center;
+        }
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        .post-image {
+            max-width: 100%;
+            margin-top: 10px;
+            border-radius: 5px;
+        }
+        .comment-input {
+            width: 100%;
+            padding: 6px;
+            margin-top: 8px;
+        }
+        .comment {
+            background: #f9f9f9;
+            padding: 5px;
+            margin-top: 5px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+<h1>Community Hub 🚀</h1>
+<!-- Profile Display -->
+<div id="profile-section" style="display:none; margin-bottom: 20px;">
+    <h3>Your Profile</h3>
+    <div style="display: flex; gap: 15px; align-items: center;">
+        <img id="profile-pic" class="avatar" src="https://via.placeholder.com/80">
+        <div>
+            <p><strong id="profile-name">Username</strong></p>
+            <p id="profile-bio">No bio yet</p>
+            <button onclick="showProfileEditor()">Edit Profile</button>
+        </div>
+    </div>
+</div>
+<!-- Create Post -->
+<div id="post-area">
+    <input type="text" id="username" placeholder="Your name (required for profile)">
+    <textarea id="postInput" placeholder="Share something..." rows="4"></textarea>
+    <input type="file" id="image-upload" accept="image/*">
+    <button onclick="createPost()">Share Post</button>
+</div>
+<!-- Posts -->
+<div id="posts-container"></div>
+<!-- Profile Editor -->
+<div id="profile-editor" style="display:none;">
+    <h3>Edit Profile</h3>
+    <input type="text" id="edit-name" placeholder="Your name">
+    <input type="text" id="edit-avatar" placeholder="Avatar URL">
+    <textarea id="edit-bio" placeholder="Your bio"></textarea>
+    <div style="margin-top:10px;">
+        <button onclick="saveProfile()">Save</button>
+        <button onclick="hideProfileEditor()">Cancel</button>
+    </div>
+</div>
+<script>
+let posts = JSON.parse(localStorage.getItem('communityPosts')) || [];
+let profiles = JSON.parse(localStorage.getItem('communityProfiles')) || {};
+let currentUser = null;
+function toBase64(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+    });
+}
+async function createPost() {
+    const text = document.getElementById('postInput').value.trim();
+    const username = document.getElementById('username').value.trim();
+    const imageInput = document.getElementById('image-upload');
+    const image = imageInput.files[0] ? await toBase64(imageInput.files[0]) : null;
+    if (!text) return;
+    const user = username || "Anonymous";
+    if (user !== "Anonymous" && !profiles[user]) {
+        profiles[user] = { avatar: "https://via.placeholder.com/80", bio: "" };
+        localStorage.setItem('communityProfiles', JSON.stringify(profiles));
+    }
+    const newPost = {
+        id: Date.now(),
+        user: user,
+        content: text,
+        date: new Date().toLocaleString(),
+        likes: 0,
+        comments: [],
+        image: image
+    };
+    posts.unshift(newPost);
+    localStorage.setItem('communityPosts', JSON.stringify(posts));
+    if (user !== "Anonymous") {
+        currentUser = user;
+        updateProfileDisplay();
+    }
+    document.getElementById('postInput').value = "";
+    document.getElementById('username').value = "";
+    imageInput.value = "";
+    showPosts();
+}
+function likePost(id) {
+    posts = posts.map(p => p.id === id ? { ...p, likes: p.likes + 1 } : p);
+    localStorage.setItem('communityPosts', JSON.stringify(posts));
+    showPosts();
+}
+
+function deletePost(id) {
+    posts = posts.filter(p => p.id !== id);
+    localStorage.setItem('communityPosts', JSON.stringify(posts));
+    showPosts();
+}
+function addComment(postId, button) {
+    const input = button.previousElementSibling;
+    const text = input.value.trim();
+    if (!text) return;
+    posts = posts.map(post => {
+        if (post.id === postId) {
+            post.comments = post.comments || [];
+            post.comments.push({
+                user: currentUser || "Anonymous",
+                text: text,
+                date: new Date().toLocaleString()
+            });
+        }
+        return post;
+    });
+    localStorage.setItem('communityPosts', JSON.stringify(posts));
+    input.value = "";
+    showPosts();
+}
+function showPosts() {
+    const container = document.getElementById('posts-container');
+    container.innerHTML = posts.map(post => `
+        <div class="post-box">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <img src="${profiles[post.user]?.avatar || 'https://via.placeholder.com/40'}" class="avatar">
+                <strong>${post.user}</strong>
+            </div>
+            <p>${post.content}</p>
+            ${post.image ? `<img src="${post.image}" class="post-image">` : ''}
+            <div class="post-actions">
+                <button onclick="likePost(${post.id})">❤️ ${post.likes}</button>
+                <button onclick="deletePost(${post.id})">🗑️ Delete</button>
+            </div>
+            <div class="comments">
+                ${(post.comments || []).map(c => `
+                    <div class="comment"><strong>${c.user}</strong>: ${c.text}</div>
+                `).join('')}
+                <input type="text" class="comment-input" placeholder="Add comment...">
+                <button onclick="addComment(${post.id}, this)">Comment</button>
+            </div>
+            <small>${post.date}</small>
+        </div>
+    `).join('');
+}
+function updateProfileDisplay() {
+    document.getElementById('profile-section').style.display = 'block';
+    document.getElementById('profile-name').textContent = currentUser;
+    document.getElementById('profile-bio').textContent = profiles[currentUser].bio;
+    document.getElementById('profile-pic').src = profiles[currentUser].avatar;
+}
+function showProfileEditor() {
+    document.getElementById('profile-editor').style.display = 'block';
+    document.getElementById('edit-name').value = currentUser;
+    document.getElementById('edit-avatar').value = profiles[currentUser].avatar;
+    document.getElementById('edit-bio').value = profiles[currentUser].bio;
+}
+function hideProfileEditor() {
+    document.getElementById('profile-editor').style.display = 'none';
+}
+function saveProfile() {
+    const newName = document.getElementById('edit-name').value.trim();
+    const avatar = document.getElementById('edit-avatar').value;
+    const bio = document.getElementById('edit-bio').value;
+    if (!newName) return;
+    delete profiles[currentUser];
+    profiles[newName] = { avatar, bio };
+    posts = posts.map(p => p.user === currentUser ? { ...p, user: newName } : p);
+    currentUser = newName;
+    localStorage.setItem('communityProfiles', JSON.stringify(profiles));
+    localStorage.setItem('communityPosts', JSON.stringify(posts));
+
+    updateProfileDisplay();
+    hideProfileEditor();
+    showPosts();
+}
+showPosts();
+</script>
+</body>
+</html>
